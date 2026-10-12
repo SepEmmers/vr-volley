@@ -5,7 +5,8 @@
         "VRVolley.Core",
         "VRVolley.Physics",
         "VRVolley.Rules",
-        "VRVolley.XR"
+        "VRVolley.XR",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

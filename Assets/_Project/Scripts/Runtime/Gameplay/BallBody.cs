@@ -20,6 +20,7 @@ namespace VRVolley.Gameplay
         [SerializeField] private float _maxBlobShadowHeight = 6.0f;
 
         [Header("State (Inspector Read-Only)")]
+        [SerializeField] private bool _isSuspended;
         [SerializeField] private Vector3 _debugVelocity;
         [SerializeField] private float _debugSpeed;
 
@@ -38,6 +39,7 @@ namespace VRVolley.Gameplay
         public BallProfileData Profile => _profile;
         public float Radius => _profile.Radius;
         public float Mass => _profile.Mass;
+        public bool IsSuspended => _isSuspended;
 
         private void Awake()
         {
@@ -59,8 +61,21 @@ namespace VRVolley.Gameplay
             ResetToPosition(transform.position, Vector3.zero, Vector3.zero);
         }
 
+        public void SuspendAt(Vector3 position)
+        {
+            _isSuspended = true;
+            _currentState = new BallState(position, Vector3.zero, Vector3.zero, Time.fixedTimeAsDouble);
+            _previousState = _currentState;
+            transform.position = position;
+            if (_visualBallTransform != null)
+            {
+                _visualBallTransform.position = position;
+            }
+        }
+
         public void ResetToPosition(Vector3 position, Vector3 velocity, Vector3 angularVelocity)
         {
+            _isSuspended = false;
             _currentState = new BallState(position, velocity, angularVelocity, Time.fixedTimeAsDouble);
             _previousState = _currentState;
             transform.position = position;
@@ -72,18 +87,31 @@ namespace VRVolley.Gameplay
 
         public void ApplyImpulse(Vector3 deltaV, Vector3 deltaOmega)
         {
+            _isSuspended = false;
             _currentState.Velocity += deltaV;
             _currentState.AngularVelocity += deltaOmega;
         }
 
         public void SetVelocity(Vector3 velocity, Vector3 angularVelocity)
         {
+            _isSuspended = false;
             _currentState.Velocity = velocity;
             _currentState.AngularVelocity = angularVelocity;
         }
 
         private void FixedUpdate()
         {
+            if (_isSuspended)
+            {
+                _previousState = _currentState;
+                transform.position = _currentState.Position;
+                if (_visualBallTransform != null)
+                {
+                    _visualBallTransform.position = _currentState.Position;
+                }
+                return;
+            }
+
             _previousState = _currentState;
             float dt = Time.fixedDeltaTime;
 

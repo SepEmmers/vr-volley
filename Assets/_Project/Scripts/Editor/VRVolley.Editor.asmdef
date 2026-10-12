@@ -6,7 +6,9 @@
         "VRVolley.Physics",
         "VRVolley.Rules",
         "VRVolley.XR",
-        "VRVolley.Gameplay"
+        "VRVolley.Gameplay",
+        "Unity.XR.CoreUtils",
+        "UnityEngine.SpatialTracking"
     ],
     "includePlatforms": [
         "Editor"
