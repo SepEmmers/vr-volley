@@ -73,7 +73,7 @@ namespace VRVolley.Tests.EditMode
             ContactMath.ResolveImpulse(
                 ref ballVel, ref ballSpin,
                 BallMass, BallRadius,
-                handPointVel, normal, in ContactParams.SpikePalm);
+                handPointVel, normal, ContactParams.SpikePalm);
 
             // Outgoing ball must have strong positive forward velocity and be within authentic spike range (20 - 30 m/s)
             float outgoingSpeed = ballVel.magnitude;
@@ -93,7 +93,7 @@ namespace VRVolley.Tests.EditMode
             ContactMath.ResolveImpulse(
                 ref ballVel, ref ballSpin,
                 BallMass, BallRadius,
-                handVel, normal, in ContactParams.ForearmPlatform);
+                handVel, normal, ContactParams.ForearmPlatform);
 
             Assert.AreEqual(new Vector3(0f, 10f, 0f), ballVel, "Separating contact must not modify velocity");
         }
@@ -112,7 +112,7 @@ namespace VRVolley.Tests.EditMode
             ContactMath.ResolveImpulse(
                 ref ballVel, ref ballSpin,
                 BallMass, BallRadius,
-                handVel, normal, in ContactParams.SpikePalm);
+                handVel, normal, ContactParams.SpikePalm);
 
             // Tangential friction must induce spin (non-zero angular velocity)
             Assert.AreNotEqual(Vector3.zero, ballSpin, "Tangential friction must impart spin to the ball");

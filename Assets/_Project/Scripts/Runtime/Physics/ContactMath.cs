@@ -80,7 +80,7 @@ namespace VRVolley.Physics
         public static void ResolveImpulse(
             ref Vector3 ballVelocity, ref Vector3 ballAngularVelocity,
             float ballMass, float ballRadius,
-            Vector3 surfaceVelocity, Vector3 normal, in ContactParams p)
+            Vector3 surfaceVelocity, Vector3 normal, ContactParams p)
         {
             Vector3 vRel = ballVelocity - surfaceVelocity;
             float vn = Vector3.Dot(vRel, normal);
