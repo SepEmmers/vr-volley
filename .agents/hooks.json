@@ -1,0 +1,11 @@
+{
+  "hotpath-lint": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python hooks\\hotpath_lint.py",
+        "timeout": 10
+      }
+    ]
+  }
+}

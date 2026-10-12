@@ -1,0 +1,28 @@
+* text=auto
+
+# Unity YAML — merge with UnityYAMLMerge if configured, never treat as binary
+*.unity    text eol=lf merge=unityyamlmerge
+*.prefab   text eol=lf merge=unityyamlmerge
+*.asset    text eol=lf merge=unityyamlmerge
+*.mat      text eol=lf merge=unityyamlmerge
+*.anim     text eol=lf merge=unityyamlmerge
+*.controller text eol=lf merge=unityyamlmerge
+*.physicMaterial text eol=lf merge=unityyamlmerge
+*.meta     text eol=lf
+
+*.cs       text diff=csharp
+*.md       text
+*.json     text
+
+# Binary assets (switch to Git LFS once the repo has a remote)
+*.png   binary
+*.jpg   binary
+*.psd   binary
+*.tga   binary
+*.exr   binary
+*.fbx   binary
+*.wav   binary
+*.mp3   binary
+*.ogg   binary
+*.ttf   binary
+*.otf   binary
