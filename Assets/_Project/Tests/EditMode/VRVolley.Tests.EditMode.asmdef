@@ -6,7 +6,8 @@
         "UnityEditor.TestRunner",
         "VRVolley.Core",
         "VRVolley.Physics",
-        "VRVolley.Rules"
+        "VRVolley.Rules",
+        "VRVolley.Gameplay"
     ],
     "includePlatforms": [
         "Editor"
