@@ -1,0 +1,16 @@
+{
+    "name": "VRVolley.Physics",
+    "rootNamespace": "VRVolley.Physics",
+    "references": [
+        "VRVolley.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
