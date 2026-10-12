@@ -1,38 +1,34 @@
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.XR;
+using UnityEngine.InputSystem;
 
 namespace VRVolley.XR
 {
     /// <summary>
-    /// Smooth thumbstick locomotion and snap turning for VR Origin on the volleyball court.
-    /// Supports Meta Quest Touch controllers (Left stick: move, Right stick: snap turn)
-    /// plus PC keyboard fallback (WASD / Arrows to move, Q/E to snap turn).
+    /// Smooth thumbstick locomotion and snap turning using Unity's New Input System.
+    /// Reads <XRController>{LeftHand}/thumbstick for movement and <XRController>{RightHand}/thumbstick for snap turning.
+    /// Includes athletic acceleration/deceleration damping and keyboard fallback (WASD / Q/E).
     /// Strictly ZERO managed allocations in per-frame loops.
     /// </summary>
     public sealed class VRPlayerLocomotion : MonoBehaviour
     {
         [Header("Movement Settings")]
-        [Tooltip("Max movement speed in meters per second.")]
-        [SerializeField] private float _moveSpeed = 3.8f;
-        [Tooltip("Deadzone radius for thumbstick input.")]
-        [SerializeField] private float _deadzone = 0.18f;
+        [SerializeField] private float _maxSpeed = 3.8f;
+        [SerializeField] private float _acceleration = 12.0f;
+        [SerializeField] private float _deceleration = 16.0f;
+        [SerializeField] private float _deadzone = 0.15f;
 
         [Header("Snap Turn Settings")]
-        [Tooltip("Degrees rotated per snap turn flick.")]
         [SerializeField] private float _snapTurnAngle = 45.0f;
-        [Tooltip("Threshold on right thumbstick X axis to trigger snap turn.")]
         [SerializeField] private float _snapThreshold = 0.65f;
-        [Tooltip("Minimum time (seconds) between snap turns.")]
         [SerializeField] private float _snapCooldown = 0.30f;
 
         [Header("References")]
         [SerializeField] private Transform _headTransform;
 
-        private InputDevice _leftController;
-        private InputDevice _rightController;
-        private readonly List<InputDevice> _deviceBuffer = new List<InputDevice>(4);
+        private InputAction _moveAction;
+        private InputAction _turnAction;
 
+        private Vector3 _currentVelocity;
         private float _snapCooldownTimer;
         private bool _snapTurnEngaged;
 
@@ -47,39 +43,26 @@ namespace VRVolley.XR
                 }
             }
 
-            RefreshDevices();
+            _moveAction = new InputAction("Move", InputActionType.Value, "<XRController>{LeftHand}/thumbstick");
+            _turnAction = new InputAction("Turn", InputActionType.Value, "<XRController>{RightHand}/thumbstick");
         }
 
         private void OnEnable()
         {
-            InputDevices.deviceConnected += OnDeviceConnected;
+            if (_moveAction != null) _moveAction.Enable();
+            if (_turnAction != null) _turnAction.Enable();
         }
 
         private void OnDisable()
         {
-            InputDevices.deviceConnected -= OnDeviceConnected;
+            if (_moveAction != null) _moveAction.Disable();
+            if (_turnAction != null) _turnAction.Disable();
         }
 
-        private void OnDeviceConnected(InputDevice dev)
+        private void OnDestroy()
         {
-            RefreshDevices();
-        }
-
-        private void RefreshDevices()
-        {
-            _deviceBuffer.Clear();
-            InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Left, _deviceBuffer);
-            if (_deviceBuffer.Count > 0)
-            {
-                _leftController = _deviceBuffer[0];
-            }
-
-            _deviceBuffer.Clear();
-            InputDevices.GetDevicesWithCharacteristics(InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Right, _deviceBuffer);
-            if (_deviceBuffer.Count > 0)
-            {
-                _rightController = _deviceBuffer[0];
-            }
+            if (_moveAction != null) _moveAction.Dispose();
+            if (_turnAction != null) _turnAction.Dispose();
         }
 
         private void Update()
@@ -91,71 +74,34 @@ namespace VRVolley.XR
                 _snapCooldownTimer -= dt;
             }
 
-            // 1. Read Movement Input (Left Stick or Keyboard WASD)
-            Vector2 moveInput = ReadMoveInput();
-
-            if (moveInput.sqrMagnitude > _deadzone * _deadzone)
-            {
-                ApplyMovement(moveInput, dt);
-            }
-
-            // 2. Read Turn Input (Right Stick or Keyboard Q/E)
-            float turnInput = ReadTurnInput();
-            HandleSnapTurn(turnInput);
-        }
-
-        private Vector2 ReadMoveInput()
-        {
+            // 1. Read Movement Input
             Vector2 input = Vector2.zero;
-
-            // VR Left Controller Thumbstick
-            if (_leftController.isValid && _leftController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 stick))
+            if (_moveAction != null && _moveAction.enabled)
             {
-                input = stick;
+                input = _moveAction.ReadValue<Vector2>();
             }
 
             // Keyboard WASD Fallback
-            if (UnityEngine.InputSystem.Keyboard.current != null)
+            if (Keyboard.current != null)
             {
-                var kb = UnityEngine.InputSystem.Keyboard.current;
+                var kb = Keyboard.current;
                 if (kb.wKey.isPressed || kb.upArrowKey.isPressed) input.y += 1.0f;
                 if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.y -= 1.0f;
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) input.x += 1.0f;
                 if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) input.x -= 1.0f;
             }
 
-            if (input.sqrMagnitude > 1.0f)
+            // Apply deadzone
+            if (input.sqrMagnitude < _deadzone * _deadzone)
+            {
+                input = Vector2.zero;
+            }
+            else if (input.sqrMagnitude > 1.0f)
             {
                 input.Normalize();
             }
 
-            return input;
-        }
-
-        private float ReadTurnInput()
-        {
-            float turn = 0f;
-
-            // VR Right Controller Thumbstick X
-            if (_rightController.isValid && _rightController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 stick))
-            {
-                turn = stick.x;
-            }
-
-            // Keyboard Q/E Fallback
-            if (UnityEngine.InputSystem.Keyboard.current != null)
-            {
-                var kb = UnityEngine.InputSystem.Keyboard.current;
-                if (kb.eKey.wasPressedThisFrame) turn += 1.0f;
-                if (kb.qKey.wasPressedThisFrame) turn -= 1.0f;
-            }
-
-            return turn;
-        }
-
-        private void ApplyMovement(Vector2 moveInput, float dt)
-        {
-            // Move relative to horizontal forward direction of the head/camera
+            // Target world velocity relative to headset view
             Vector3 forward = _headTransform != null ? _headTransform.forward : transform.forward;
             forward.y = 0f;
             forward.Normalize();
@@ -164,8 +110,33 @@ namespace VRVolley.XR
             right.y = 0f;
             right.Normalize();
 
-            Vector3 moveDir = (forward * moveInput.y + right * moveInput.x);
-            transform.position += moveDir * (_moveSpeed * dt);
+            Vector3 targetVelocity = (forward * input.y + right * input.x) * _maxSpeed;
+
+            // Smooth athletic acceleration / deceleration
+            float rate = targetVelocity.sqrMagnitude > 0.01f ? _acceleration : _deceleration;
+            _currentVelocity = Vector3.MoveTowards(_currentVelocity, targetVelocity, rate * dt);
+
+            if (_currentVelocity.sqrMagnitude > 1e-4f)
+            {
+                transform.position += _currentVelocity * dt;
+            }
+
+            // 2. Read Turn Input
+            float turnInput = 0f;
+            if (_turnAction != null && _turnAction.enabled)
+            {
+                turnInput = _turnAction.ReadValue<Vector2>().x;
+            }
+
+            // Keyboard Q/E Fallback
+            if (Keyboard.current != null)
+            {
+                var kb = Keyboard.current;
+                if (kb.eKey.wasPressedThisFrame) turnInput += 1.0f;
+                if (kb.qKey.wasPressedThisFrame) turnInput -= 1.0f;
+            }
+
+            HandleSnapTurn(turnInput);
         }
 
         private void HandleSnapTurn(float turnInput)
@@ -184,7 +155,6 @@ namespace VRVolley.XR
             float sign = Mathf.Sign(turnInput);
             float angle = sign * _snapTurnAngle;
 
-            // Rotate XR Origin around the head position on the floor
             Vector3 pivot = _headTransform != null ? _headTransform.position : transform.position;
             pivot.y = transform.position.y;
 

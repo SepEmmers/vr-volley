@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.SpatialTracking;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 using Unity.XR.CoreUtils;
 using VRVolley.Gameplay;
 using VRVolley.XR;
@@ -20,8 +21,22 @@ namespace VRVolley.Editor
             Undo.SetCurrentGroupName("Build Beach Volleyball Scene");
             int undoGroup = Undo.GetCurrentGroup();
 
+            // 0. Clean up any existing generated roots to prevent duplicates
+            DestroyIfExists("--- ENVIRONMENT ---");
+            DestroyIfExists("--- GAMEPLAY ---");
+            DestroyIfExists("XR Origin (VR Rig)");
+            DestroyIfExists("DrillKiosk_Menu");
+
+            // Clean up standalone cameras
+            Camera[] oldCams = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+            foreach (Camera c in oldCams)
+            {
+                Object.DestroyImmediate(c.gameObject);
+            }
+
             // 1. Root Environment
-            GameObject envRoot = GetOrCreateRoot("--- ENVIRONMENT ---");
+            GameObject envRoot = new GameObject("--- ENVIRONMENT ---");
+            Undo.RegisterCreatedObjectUndo(envRoot, "Create Environment Root");
 
             // Sand Court Ground
             GameObject sandGround = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -30,7 +45,6 @@ namespace VRVolley.Editor
             sandGround.transform.position = Vector3.zero;
             sandGround.transform.localScale = new Vector3(3.0f, 1.0f, 3.0f); // 30m x 30m beach free zone
             sandGround.layer = LayerMask.NameToLayer("Default");
-            Undo.RegisterCreatedObjectUndo(sandGround, "Create Sand Ground");
 
             // 2. Net System
             GameObject netRoot = new GameObject("NetSystem");
@@ -60,8 +74,6 @@ namespace VRVolley.Editor
             CreateAntenna(netRoot.transform, -4.0f);
             CreateAntenna(netRoot.transform, 4.0f);
 
-            Undo.RegisterCreatedObjectUndo(netRoot, "Create Net System");
-
             // 3. Court Boundary Lines (16m x 8m)
             GameObject linesRoot = new GameObject("BoundaryLines_16x8m");
             linesRoot.transform.parent = envRoot.transform;
@@ -72,119 +84,107 @@ namespace VRVolley.Editor
             CreateLineSegment(linesRoot.transform, "Endline_TeamA", new Vector3(0f, 0f, -8.0f), new Vector3(8.0f, 1f, 0.05f));
             CreateLineSegment(linesRoot.transform, "Endline_TeamB", new Vector3(0f, 0f, 8.0f), new Vector3(8.0f, 1f, 0.05f));
 
-            Undo.RegisterCreatedObjectUndo(linesRoot, "Create Boundary Lines");
-
             // 4. Volleyball GameObject
-            GameObject gameplayRoot = GetOrCreateRoot("--- GAMEPLAY ---");
-            GameObject ballGo = GameObject.Find("Volleyball");
-            if (ballGo == null)
-            {
-                ballGo = new GameObject("Volleyball");
-                ballGo.transform.parent = gameplayRoot.transform;
-                ballGo.transform.position = new Vector3(0f, 1.8f, -8.5f);
+            GameObject gameplayRoot = new GameObject("--- GAMEPLAY ---");
+            Undo.RegisterCreatedObjectUndo(gameplayRoot, "Create Gameplay Root");
 
-                Rigidbody rb = ballGo.AddComponent<Rigidbody>();
-                rb.isKinematic = true;
-                rb.useGravity = false;
+            GameObject ballGo = new GameObject("Volleyball");
+            ballGo.transform.parent = gameplayRoot.transform;
+            ballGo.transform.position = new Vector3(0f, 1.8f, -8.5f);
 
-                SphereCollider sc = ballGo.AddComponent<SphereCollider>();
-                sc.radius = 0.107f;
-                sc.isTrigger = true;
+            Rigidbody rb = ballGo.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
 
-                BallBody ballBody = ballGo.AddComponent<BallBody>();
+            SphereCollider sc = ballGo.AddComponent<SphereCollider>();
+            sc.radius = 0.107f;
+            sc.isTrigger = true;
 
-                // Visual Ball Sphere Child
-                GameObject visualBall = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                visualBall.name = "VisualBall";
-                visualBall.transform.parent = ballGo.transform;
-                visualBall.transform.localPosition = Vector3.zero;
-                visualBall.transform.localScale = Vector3.one * (0.107f * 2f);
-                Object.DestroyImmediate(visualBall.GetComponent<Collider>());
+            BallBody activeBallBody = ballGo.AddComponent<BallBody>();
 
-                // Blob Shadow Child
-                GameObject blobShadow = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                blobShadow.name = "BlobShadowDecal";
-                blobShadow.transform.parent = ballGo.transform;
-                blobShadow.transform.position = new Vector3(0f, 0.005f, -8.5f);
-                blobShadow.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-                blobShadow.transform.localScale = new Vector3(0.25f, 0.25f, 0.25f);
-                Object.DestroyImmediate(blobShadow.GetComponent<Collider>());
+            // Visual Ball Sphere Child
+            GameObject visualBall = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            visualBall.name = "VisualBall";
+            visualBall.transform.parent = ballGo.transform;
+            visualBall.transform.localPosition = Vector3.zero;
+            visualBall.transform.localScale = Vector3.one * (0.107f * 2f);
+            Object.DestroyImmediate(visualBall.GetComponent<Collider>());
 
-                Undo.RegisterCreatedObjectUndo(ballGo, "Create Volleyball");
-            }
-
-            BallBody activeBallBody = ballGo.GetComponent<BallBody>();
+            // Blob Shadow Child
+            GameObject blobShadow = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            blobShadow.name = "BlobShadowDecal";
+            blobShadow.transform.parent = ballGo.transform;
+            blobShadow.transform.position = new Vector3(0f, 0.005f, -8.5f);
+            blobShadow.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            blobShadow.transform.localScale = new Vector3(0.25f, 0.25f, 0.25f);
+            Object.DestroyImmediate(blobShadow.GetComponent<Collider>());
 
             // 5. Match Coordinator
-            GameObject coordinatorGo = GameObject.Find("MatchCoordinator");
-            if (coordinatorGo == null)
-            {
-                coordinatorGo = new GameObject("MatchCoordinator");
-                coordinatorGo.transform.parent = gameplayRoot.transform;
-                coordinatorGo.AddComponent<MatchCoordinator>();
-                Undo.RegisterCreatedObjectUndo(coordinatorGo, "Create Match Coordinator");
-            }
+            GameObject coordinatorGo = new GameObject("MatchCoordinator");
+            coordinatorGo.transform.parent = gameplayRoot.transform;
+            coordinatorGo.AddComponent<MatchCoordinator>();
 
             // 6. XR Origin (VR Rig)
-            GameObject rigRoot = GetOrCreateRoot("XR Origin (VR Rig)");
+            GameObject rigRoot = new GameObject("XR Origin (VR Rig)");
             rigRoot.transform.position = new Vector3(0f, 0f, -5.0f);
             rigRoot.tag = "Player";
+            Undo.RegisterCreatedObjectUndo(rigRoot, "Create XR Origin");
 
-            XROrigin xrOrigin = rigRoot.GetComponent<XROrigin>();
-            if (xrOrigin == null) xrOrigin = rigRoot.AddComponent<XROrigin>();
+            XROrigin xrOrigin = rigRoot.AddComponent<XROrigin>();
 
-            GameObject offsetGo = GetOrCreateChild(rigRoot.transform, "Camera Offset");
+            GameObject offsetGo = new GameObject("Camera Offset");
+            offsetGo.transform.parent = rigRoot.transform;
             offsetGo.transform.localPosition = Vector3.zero;
 
             // Head / Main Camera
-            GameObject camGo = GetOrCreateChild(offsetGo.transform, "Main Camera");
+            GameObject camGo = new GameObject("Main Camera");
+            camGo.transform.parent = offsetGo.transform;
+            camGo.transform.localPosition = Vector3.zero;
             camGo.tag = "MainCamera";
-            Camera cam = camGo.GetComponent<Camera>();
-            if (cam == null) cam = camGo.AddComponent<Camera>();
+
+            Camera cam = camGo.AddComponent<Camera>();
             cam.nearClipPlane = 0.05f;
             cam.farClipPlane = 200.0f;
+            camGo.AddComponent<AudioListener>();
 
-            if (camGo.GetComponent<AudioListener>() == null)
-            {
-                camGo.AddComponent<AudioListener>();
-            }
-
-            TrackedPoseDriver headDriver = camGo.GetComponent<TrackedPoseDriver>();
-            if (headDriver == null) headDriver = camGo.AddComponent<TrackedPoseDriver>();
-            headDriver.SetPoseSource(TrackedPoseDriver.DeviceType.GenericXRDevice, TrackedPoseDriver.TrackedPose.Head);
-
-            // Clean up old root standalone camera if present
-            Camera[] allCams = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
-            foreach (Camera c in allCams)
-            {
-                if (c != cam && c.transform.parent != offsetGo.transform)
-                {
-                    Object.DestroyImmediate(c.gameObject);
-                }
-            }
+            // New Input System TrackedPoseDriver for Head
+            var headDriver = camGo.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
+            headDriver.positionInput = new InputActionProperty(
+                new InputAction("HeadPosition", InputActionType.Value, "<XRHMD>/centerEyePosition"));
+            headDriver.rotationInput = new InputActionProperty(
+                new InputAction("HeadRotation", InputActionType.Value, "<XRHMD>/centerEyeRotation"));
+            headDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
 
             // Left Controller
-            GameObject leftHandGo = GetOrCreateChild(offsetGo.transform, "Left Hand Controller");
+            GameObject leftHandGo = new GameObject("Left Hand Controller");
+            leftHandGo.transform.parent = offsetGo.transform;
             leftHandGo.transform.localPosition = new Vector3(-0.25f, 1.0f, 0.35f);
             leftHandGo.tag = "GameController";
-            TrackedPoseDriver leftDriver = leftHandGo.GetComponent<TrackedPoseDriver>();
-            if (leftDriver == null) leftDriver = leftHandGo.AddComponent<TrackedPoseDriver>();
-            leftDriver.SetPoseSource(TrackedPoseDriver.DeviceType.GenericXRDevice, TrackedPoseDriver.TrackedPose.LeftPose);
 
-            TrackedVelocityEstimator leftEstimator = leftHandGo.GetComponent<TrackedVelocityEstimator>();
-            if (leftEstimator == null) leftEstimator = leftHandGo.AddComponent<TrackedVelocityEstimator>();
+            var leftDriver = leftHandGo.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
+            leftDriver.positionInput = new InputActionProperty(
+                new InputAction("LeftPosition", InputActionType.Value, "<XRController>{LeftHand}/devicePosition"));
+            leftDriver.rotationInput = new InputActionProperty(
+                new InputAction("LeftRotation", InputActionType.Value, "<XRController>{LeftHand}/deviceRotation"));
+            leftDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+
+            TrackedVelocityEstimator leftEstimator = leftHandGo.AddComponent<TrackedVelocityEstimator>();
             CreateControllerVisuals(leftHandGo.transform, false);
 
             // Right Controller
-            GameObject rightHandGo = GetOrCreateChild(offsetGo.transform, "Right Hand Controller");
+            GameObject rightHandGo = new GameObject("Right Hand Controller");
+            rightHandGo.transform.parent = offsetGo.transform;
             rightHandGo.transform.localPosition = new Vector3(0.25f, 1.0f, 0.35f);
             rightHandGo.tag = "GameController";
-            TrackedPoseDriver rightDriver = rightHandGo.GetComponent<TrackedPoseDriver>();
-            if (rightDriver == null) rightDriver = rightHandGo.AddComponent<TrackedPoseDriver>();
-            rightDriver.SetPoseSource(TrackedPoseDriver.DeviceType.GenericXRDevice, TrackedPoseDriver.TrackedPose.RightPose);
 
-            TrackedVelocityEstimator rightEstimator = rightHandGo.GetComponent<TrackedVelocityEstimator>();
-            if (rightEstimator == null) rightEstimator = rightHandGo.AddComponent<TrackedVelocityEstimator>();
+            var rightDriver = rightHandGo.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
+            rightDriver.positionInput = new InputActionProperty(
+                new InputAction("RightPosition", InputActionType.Value, "<XRController>{RightHand}/devicePosition"));
+            rightDriver.rotationInput = new InputActionProperty(
+                new InputAction("RightRotation", InputActionType.Value, "<XRController>{RightHand}/deviceRotation"));
+            rightDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+
+            TrackedVelocityEstimator rightEstimator = rightHandGo.AddComponent<TrackedVelocityEstimator>();
             CreateControllerVisuals(rightHandGo.transform, true);
 
             // Configure XROrigin
@@ -194,32 +194,26 @@ namespace VRVolley.Editor
             xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
 
             // Wire VR Volley Rig Components
-            VRVolleyHaptics haptics = rigRoot.GetComponent<VRVolleyHaptics>();
-            if (haptics == null) haptics = rigRoot.AddComponent<VRVolleyHaptics>();
+            VRVolleyHaptics haptics = rigRoot.AddComponent<VRVolleyHaptics>();
 
-            BodyContactVolumes contactVolumes = rigRoot.GetComponent<BodyContactVolumes>();
-            if (contactVolumes == null) contactVolumes = rigRoot.AddComponent<BodyContactVolumes>();
+            BodyContactVolumes contactVolumes = rigRoot.AddComponent<BodyContactVolumes>();
             SerializedObject soVolumes = new SerializedObject(contactVolumes);
             soVolumes.FindProperty("_leftEstimator").objectReferenceValue = leftEstimator;
             soVolumes.FindProperty("_rightEstimator").objectReferenceValue = rightEstimator;
             soVolumes.ApplyModifiedProperties();
 
-            HandBallContactSolver solver = rigRoot.GetComponent<HandBallContactSolver>();
-            if (solver == null) solver = rigRoot.AddComponent<HandBallContactSolver>();
+            HandBallContactSolver solver = rigRoot.AddComponent<HandBallContactSolver>();
             SerializedObject soSolver = new SerializedObject(solver);
             soSolver.FindProperty("_ballBody").objectReferenceValue = activeBallBody;
             soSolver.FindProperty("_contactVolumes").objectReferenceValue = contactVolumes;
             soSolver.FindProperty("_haptics").objectReferenceValue = haptics;
             soSolver.ApplyModifiedProperties();
 
-            // Locomotion (Smooth Thumbstick Movement & Snap Turn)
-            VRPlayerLocomotion locomotion = rigRoot.GetComponent<VRPlayerLocomotion>();
-            if (locomotion == null) locomotion = rigRoot.AddComponent<VRPlayerLocomotion>();
+            // Smooth Locomotion & Snap Turn
+            VRPlayerLocomotion locomotion = rigRoot.AddComponent<VRPlayerLocomotion>();
 
             // 7. Drill Situation Manager & 3D Interactive Kiosk
-            DrillSituationManager drillManager = coordinatorGo.GetComponent<DrillSituationManager>();
-            if (drillManager == null) drillManager = coordinatorGo.AddComponent<DrillSituationManager>();
-
+            DrillSituationManager drillManager = coordinatorGo.AddComponent<DrillSituationManager>();
             GameObject kioskGo = CreateDrillKiosk(gameplayRoot.transform, drillManager);
 
             SerializedObject soManager = new SerializedObject(drillManager);
@@ -235,55 +229,56 @@ namespace VRVolley.Editor
 
         private static GameObject CreateDrillKiosk(Transform parent, DrillSituationManager drillManager)
         {
-            GameObject kioskGo = GameObject.Find("DrillKiosk_Menu");
-            if (kioskGo != null)
-            {
-                Object.DestroyImmediate(kioskGo);
-            }
-
-            kioskGo = new GameObject("DrillKiosk_Menu");
+            GameObject kioskGo = new GameObject("DrillKiosk_Menu");
             kioskGo.transform.parent = parent;
-            // Positioned within direct arm's reach of the player spawn at (0, 0, -5.0)
-            kioskGo.transform.position = new Vector3(-1.0f, 0f, -4.8f);
+            // Positioned cleanly within arm's reach of player spawn at (0, 0, -5.0)
+            kioskGo.transform.position = new Vector3(-0.95f, 0f, -4.75f);
             kioskGo.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
 
-            // Kiosk Pedestal
+            // Kiosk Pedestal (Stops cleanly at Y = 0.84m so it NEVER pokes through the board!)
             GameObject pedestal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pedestal.name = "Pedestal";
             pedestal.transform.parent = kioskGo.transform;
-            pedestal.transform.localPosition = new Vector3(0f, 0.50f, 0f);
-            pedestal.transform.localScale = new Vector3(0.14f, 0.50f, 0.14f);
+            pedestal.transform.localPosition = new Vector3(0f, 0.42f, 0f);
+            pedestal.transform.localScale = new Vector3(0.10f, 0.42f, 0.10f);
 
-            // Console Board (angled backwards 25 degrees)
-            GameObject board = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            board.name = "ConsoleBoard";
-            board.transform.parent = kioskGo.transform;
-            board.transform.localPosition = new Vector3(0f, 1.05f, 0f);
-            board.transform.localRotation = Quaternion.Euler(25f, 0f, 0f);
-            board.transform.localScale = new Vector3(1.15f, 0.72f, 0.06f);
+            // Console Panel root (Uniform scale Vector3.one so all child text is 100% distortion-free!)
+            GameObject panel = new GameObject("ConsolePanel");
+            panel.transform.parent = kioskGo.transform;
+            panel.transform.localPosition = new Vector3(0f, 1.15f, 0f);
+            panel.transform.localRotation = Quaternion.Euler(20f, 0f, 0f);
+            panel.transform.localScale = Vector3.one;
+
+            // Flat Backboard Mesh
+            GameObject boardMesh = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            boardMesh.name = "BackboardMesh";
+            boardMesh.transform.parent = panel.transform;
+            boardMesh.transform.localPosition = Vector3.zero;
+            boardMesh.transform.localRotation = Quaternion.identity;
+            boardMesh.transform.localScale = new Vector3(1.10f, 0.72f, 0.04f);
 
             // Header Title Text
-            Create3DLabel(board.transform, "HeaderTitle", "VOLLEYBALL DRILL SELECTOR",
-                new Vector3(0f, 0.28f, -0.04f), 0.013f, 40, new Color(1.0f, 0.85f, 0.20f));
+            Create3DLabel(panel.transform, "HeaderTitle", "VOLLEYBALL DRILLS",
+                new Vector3(0f, 0.28f, -0.035f), 0.016f, 44, new Color(1.0f, 0.85f, 0.15f));
 
-            // Buttons
-            CreateKioskButton(board.transform, drillManager, DrillSituation.DigFloatServe, false,
-                "1. DIG FLOAT SERVE", new Vector3(-0.27f, 0.13f, -0.04f), new Color(0.20f, 0.55f, 0.95f));
+            // Buttons: 2 columns x 3 rows
+            CreateKioskButton(panel.transform, drillManager, DrillSituation.DigFloatServe, false,
+                "1. DIG FLOAT SERVE", new Vector3(-0.27f, 0.13f, -0.035f), new Color(0.20f, 0.60f, 1.0f));
 
-            CreateKioskButton(board.transform, drillManager, DrillSituation.DigHardSpike, false,
-                "2. DIG HARD SPIKE", new Vector3(0.27f, 0.13f, -0.04f), new Color(0.95f, 0.30f, 0.25f));
+            CreateKioskButton(panel.transform, drillManager, DrillSituation.DigHardSpike, false,
+                "2. DIG HARD SPIKE", new Vector3(0.27f, 0.13f, -0.035f), new Color(1.0f, 0.32f, 0.28f));
 
-            CreateKioskButton(board.transform, drillManager, DrillSituation.SetterPractice, false,
-                "3. SETTER DRILL", new Vector3(-0.27f, -0.03f, -0.04f), new Color(0.15f, 0.80f, 0.85f));
+            CreateKioskButton(panel.transform, drillManager, DrillSituation.SetterPractice, false,
+                "3. SETTER DRILL", new Vector3(-0.27f, -0.03f, -0.035f), new Color(0.20f, 0.88f, 0.90f));
 
-            CreateKioskButton(board.transform, drillManager, DrillSituation.SpikeApproachPractice, false,
-                "4. SPIKE RUN-UP", new Vector3(0.27f, -0.03f, -0.04f), new Color(0.68f, 0.35f, 0.95f));
+            CreateKioskButton(panel.transform, drillManager, DrillSituation.SpikeApproachPractice, false,
+                "4. SPIKE RUN-UP", new Vector3(0.27f, -0.03f, -0.035f), new Color(0.75f, 0.40f, 1.0f));
 
-            CreateKioskButton(board.transform, drillManager, DrillSituation.SelfServe, false,
-                "5. SELF SERVE (FLOAT)", new Vector3(-0.27f, -0.19f, -0.04f), new Color(0.20f, 0.82f, 0.45f));
+            CreateKioskButton(panel.transform, drillManager, DrillSituation.SelfServe, false,
+                "5. SELF SERVE (FLOAT)", new Vector3(-0.27f, -0.19f, -0.035f), new Color(0.20f, 0.88f, 0.50f));
 
-            CreateKioskButton(board.transform, drillManager, DrillSituation.DigFloatServe, true,
-                "REPLAY / REPEAT", new Vector3(0.27f, -0.19f, -0.04f), new Color(0.95f, 0.65f, 0.15f));
+            CreateKioskButton(panel.transform, drillManager, DrillSituation.DigFloatServe, true,
+                "REPLAY / REPEAT", new Vector3(0.27f, -0.19f, -0.035f), new Color(1.0f, 0.70f, 0.20f));
 
             return kioskGo;
         }
@@ -302,7 +297,7 @@ namespace VRVolley.Editor
             btnGo.transform.parent = parent;
             btnGo.transform.localPosition = localPos;
             btnGo.transform.localRotation = Quaternion.identity;
-            btnGo.transform.localScale = new Vector3(0.50f, 0.12f, 0.04f);
+            btnGo.transform.localScale = new Vector3(0.48f, 0.12f, 0.04f);
 
             Collider col = btnGo.GetComponent<Collider>();
             if (col != null)
@@ -321,7 +316,8 @@ namespace VRVolley.Editor
                 btnComp.Configure(situation, manager, renderer, color);
             }
 
-            Create3DLabel(btnGo.transform, "Label", label, new Vector3(0f, 0f, -0.6f), 0.022f, 32, Color.white);
+            Vector3 textPos = localPos + new Vector3(0f, 0f, -0.025f);
+            Create3DLabel(parent, "Label_" + btnGo.name, label, textPos, 0.010f, 36, Color.white);
         }
 
         private static void Create3DLabel(
@@ -350,27 +346,44 @@ namespace VRVolley.Editor
 
         private static void CreateControllerVisuals(Transform controllerTransform, bool isRight)
         {
+            GameObject visualRoot = new GameObject(isRight ? "RightVisualRoot" : "LeftVisualRoot");
+            visualRoot.transform.parent = controllerTransform;
+            visualRoot.transform.localPosition = Vector3.zero;
+            visualRoot.transform.localRotation = Quaternion.identity;
+
             // Palm Visual
             GameObject palm = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             palm.name = isRight ? "RightPalmVisual" : "LeftPalmVisual";
-            palm.transform.parent = controllerTransform;
-            palm.transform.localPosition = new Vector3(0f, -0.02f, 0.06f);
+            palm.transform.parent = visualRoot.transform;
+            palm.transform.localPosition = new Vector3(0f, -0.02f, 0.05f);
             palm.transform.localScale = new Vector3(0.08f, 0.04f, 0.09f);
             Object.DestroyImmediate(palm.GetComponent<Collider>());
 
             // Forearm Visual
             GameObject arm = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             arm.name = isRight ? "RightForearmVisual" : "LeftForearmVisual";
-            arm.transform.parent = controllerTransform;
+            arm.transform.parent = visualRoot.transform;
             arm.transform.localPosition = new Vector3(0f, -0.04f, -0.14f);
             arm.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             arm.transform.localScale = new Vector3(0.07f, 0.12f, 0.07f);
             Object.DestroyImmediate(arm.GetComponent<Collider>());
 
-            // Button trigger volume
+            // Fingertip Pointer Sphere (gives clear visual target for touching kiosk buttons)
+            GameObject tip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            tip.name = isRight ? "RightPointerTip" : "LeftPointerTip";
+            tip.transform.parent = visualRoot.transform;
+            tip.transform.localPosition = new Vector3(0f, -0.01f, 0.12f);
+            tip.transform.localScale = new Vector3(0.03f, 0.03f, 0.03f);
+            Object.DestroyImmediate(tip.GetComponent<Collider>());
+
+            // VR Hand Visual controller (starts hidden until controller is actively tracked)
+            VRHandVisual handVisual = controllerTransform.gameObject.AddComponent<VRHandVisual>();
+            handVisual.Configure(isRight, visualRoot);
+
+            // Trigger volume for kiosk button pressing
             BoxCollider trigger = controllerTransform.gameObject.AddComponent<BoxCollider>();
-            trigger.center = new Vector3(0f, -0.02f, 0.05f);
-            trigger.size = new Vector3(0.12f, 0.08f, 0.16f);
+            trigger.center = new Vector3(0f, -0.02f, 0.06f);
+            trigger.size = new Vector3(0.14f, 0.10f, 0.18f);
             trigger.isTrigger = true;
         }
 
@@ -408,29 +421,14 @@ namespace VRVolley.Editor
             Object.DestroyImmediate(line.GetComponent<Collider>());
         }
 
-        private static GameObject GetOrCreateRoot(string name)
+        private static void DestroyIfExists(string name)
         {
             GameObject go = GameObject.Find(name);
-            if (go == null)
+            while (go != null)
             {
-                go = new GameObject(name);
-                Undo.RegisterCreatedObjectUndo(go, "Create " + name);
+                Object.DestroyImmediate(go);
+                go = GameObject.Find(name);
             }
-            return go;
-        }
-
-        private static GameObject GetOrCreateChild(Transform parent, string name)
-        {
-            Transform child = parent.Find(name);
-            if (child != null)
-            {
-                return child.gameObject;
-            }
-            GameObject go = new GameObject(name);
-            go.transform.parent = parent;
-            go.transform.localPosition = Vector3.zero;
-            go.transform.localRotation = Quaternion.identity;
-            return go;
         }
     }
 }

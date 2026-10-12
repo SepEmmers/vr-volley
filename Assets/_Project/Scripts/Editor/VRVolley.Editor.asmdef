@@ -8,7 +8,7 @@
         "VRVolley.XR",
         "VRVolley.Gameplay",
         "Unity.XR.CoreUtils",
-        "UnityEngine.SpatialTracking"
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"
