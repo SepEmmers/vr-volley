@@ -100,7 +100,7 @@ namespace VRVolley.Gameplay
             if (dispDist > 1e-5f)
             {
                 Vector3 dispDir = disp / dispDist;
-                int hitCount = Physics.SphereCastNonAlloc(
+                int hitCount = UnityEngine.Physics.SphereCastNonAlloc(
                     startPos,
                     _profile.Radius,
                     dispDir,

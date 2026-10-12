@@ -6,9 +6,7 @@
         "VRVolley.Physics",
         "VRVolley.Rules",
         "VRVolley.XR",
-        "VRVolley.Gameplay",
-        "Unity.XR.Interaction.Toolkit",
-        "Unity.XR.CoreUtils"
+        "VRVolley.Gameplay"
     ],
     "includePlatforms": [
         "Editor"
