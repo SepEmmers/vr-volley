@@ -212,22 +212,28 @@ namespace VRVolley.Editor
             soSolver.FindProperty("_haptics").objectReferenceValue = haptics;
             soSolver.ApplyModifiedProperties();
 
+            // Locomotion (Smooth Thumbstick Movement & Snap Turn)
+            VRPlayerLocomotion locomotion = rigRoot.GetComponent<VRPlayerLocomotion>();
+            if (locomotion == null) locomotion = rigRoot.AddComponent<VRPlayerLocomotion>();
+
             // 7. Drill Situation Manager & 3D Interactive Kiosk
             DrillSituationManager drillManager = coordinatorGo.GetComponent<DrillSituationManager>();
             if (drillManager == null) drillManager = coordinatorGo.AddComponent<DrillSituationManager>();
+
+            GameObject kioskGo = CreateDrillKiosk(gameplayRoot.transform, drillManager);
+
             SerializedObject soManager = new SerializedObject(drillManager);
             soManager.FindProperty("_ballBody").objectReferenceValue = activeBallBody;
             soManager.FindProperty("_playerRigTransform").objectReferenceValue = rigRoot.transform;
+            soManager.FindProperty("_kioskTransform").objectReferenceValue = kioskGo.transform;
             soManager.ApplyModifiedProperties();
-
-            CreateDrillKiosk(gameplayRoot.transform, drillManager);
 
             Undo.CollapseUndoOperations(undoGroup);
             Selection.activeGameObject = ballGo;
             Debug.Log("[VR Volley] FIVB Beach Volleyball Court, XR Rig, and 3D Drill Kiosk successfully built!");
         }
 
-        private static void CreateDrillKiosk(Transform parent, DrillSituationManager drillManager)
+        private static GameObject CreateDrillKiosk(Transform parent, DrillSituationManager drillManager)
         {
             GameObject kioskGo = GameObject.Find("DrillKiosk_Menu");
             if (kioskGo != null)
@@ -237,8 +243,9 @@ namespace VRVolley.Editor
 
             kioskGo = new GameObject("DrillKiosk_Menu");
             kioskGo.transform.parent = parent;
-            kioskGo.transform.position = new Vector3(-3.4f, 0f, -5.0f);
-            kioskGo.transform.rotation = Quaternion.Euler(0f, 75f, 0f);
+            // Positioned within direct arm's reach of the player spawn at (0, 0, -5.0)
+            kioskGo.transform.position = new Vector3(-1.0f, 0f, -4.8f);
+            kioskGo.transform.rotation = Quaternion.Euler(0f, 45f, 0f);
 
             // Kiosk Pedestal
             GameObject pedestal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -277,6 +284,8 @@ namespace VRVolley.Editor
 
             CreateKioskButton(board.transform, drillManager, DrillSituation.DigFloatServe, true,
                 "REPLAY / REPEAT", new Vector3(0.27f, -0.19f, -0.04f), new Color(0.95f, 0.65f, 0.15f));
+
+            return kioskGo;
         }
 
         private static void CreateKioskButton(
