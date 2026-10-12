@@ -147,13 +147,8 @@ namespace VRVolley.Editor
             cam.farClipPlane = 200.0f;
             camGo.AddComponent<AudioListener>();
 
-            // New Input System TrackedPoseDriver for Head
-            var headDriver = camGo.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
-            headDriver.positionInput = new InputActionProperty(
-                new InputAction("HeadPosition", InputActionType.Value, "<XRHMD>/centerEyePosition"));
-            headDriver.rotationInput = new InputActionProperty(
-                new InputAction("HeadRotation", InputActionType.Value, "<XRHMD>/centerEyeRotation"));
-            headDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+            // Head Tracking
+            camGo.AddComponent<VRTrackedHead>();
 
             // Left Controller
             GameObject leftHandGo = new GameObject("Left Hand Controller");
@@ -161,15 +156,11 @@ namespace VRVolley.Editor
             leftHandGo.transform.localPosition = new Vector3(-0.25f, 1.0f, 0.35f);
             leftHandGo.tag = "GameController";
 
-            var leftDriver = leftHandGo.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
-            leftDriver.positionInput = new InputActionProperty(
-                new InputAction("LeftPosition", InputActionType.Value, "<XRController>{LeftHand}/devicePosition"));
-            leftDriver.rotationInput = new InputActionProperty(
-                new InputAction("LeftRotation", InputActionType.Value, "<XRController>{LeftHand}/deviceRotation"));
-            leftDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+            GameObject leftVisualRoot = CreateControllerVisuals(leftHandGo.transform, false);
+            VRTrackedController leftTracker = leftHandGo.AddComponent<VRTrackedController>();
+            leftTracker.Configure(false, leftVisualRoot);
 
             TrackedVelocityEstimator leftEstimator = leftHandGo.AddComponent<TrackedVelocityEstimator>();
-            CreateControllerVisuals(leftHandGo.transform, false);
 
             // Right Controller
             GameObject rightHandGo = new GameObject("Right Hand Controller");
@@ -177,15 +168,11 @@ namespace VRVolley.Editor
             rightHandGo.transform.localPosition = new Vector3(0.25f, 1.0f, 0.35f);
             rightHandGo.tag = "GameController";
 
-            var rightDriver = rightHandGo.AddComponent<UnityEngine.InputSystem.XR.TrackedPoseDriver>();
-            rightDriver.positionInput = new InputActionProperty(
-                new InputAction("RightPosition", InputActionType.Value, "<XRController>{RightHand}/devicePosition"));
-            rightDriver.rotationInput = new InputActionProperty(
-                new InputAction("RightRotation", InputActionType.Value, "<XRController>{RightHand}/deviceRotation"));
-            rightDriver.trackingType = UnityEngine.InputSystem.XR.TrackedPoseDriver.TrackingType.RotationAndPosition;
+            GameObject rightVisualRoot = CreateControllerVisuals(rightHandGo.transform, true);
+            VRTrackedController rightTracker = rightHandGo.AddComponent<VRTrackedController>();
+            rightTracker.Configure(true, rightVisualRoot);
 
             TrackedVelocityEstimator rightEstimator = rightHandGo.AddComponent<TrackedVelocityEstimator>();
-            CreateControllerVisuals(rightHandGo.transform, true);
 
             // Configure XROrigin
             xrOrigin.Origin = rigRoot;
@@ -344,7 +331,7 @@ namespace VRVolley.Editor
             textMesh.color = textColor;
         }
 
-        private static void CreateControllerVisuals(Transform controllerTransform, bool isRight)
+        private static GameObject CreateControllerVisuals(Transform controllerTransform, bool isRight)
         {
             GameObject visualRoot = new GameObject(isRight ? "RightVisualRoot" : "LeftVisualRoot");
             visualRoot.transform.parent = controllerTransform;
@@ -376,15 +363,13 @@ namespace VRVolley.Editor
             tip.transform.localScale = new Vector3(0.03f, 0.03f, 0.03f);
             Object.DestroyImmediate(tip.GetComponent<Collider>());
 
-            // VR Hand Visual controller (starts hidden until controller is actively tracked)
-            VRHandVisual handVisual = controllerTransform.gameObject.AddComponent<VRHandVisual>();
-            handVisual.Configure(isRight, visualRoot);
-
             // Trigger volume for kiosk button pressing
             BoxCollider trigger = controllerTransform.gameObject.AddComponent<BoxCollider>();
             trigger.center = new Vector3(0f, -0.02f, 0.06f);
             trigger.size = new Vector3(0.14f, 0.10f, 0.18f);
             trigger.isTrigger = true;
+
+            return visualRoot;
         }
 
         private static void CreateNetPost(Transform parent, float xPos)
