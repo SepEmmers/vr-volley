@@ -1,0 +1,19 @@
+{
+    "name": "VRVolley.Gameplay",
+    "rootNamespace": "VRVolley.Gameplay",
+    "references": [
+        "VRVolley.Core",
+        "VRVolley.Physics",
+        "VRVolley.Rules",
+        "VRVolley.XR"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
