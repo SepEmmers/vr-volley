@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using VRVolley.XR;
 
 namespace VRVolley.Gameplay
@@ -20,6 +21,10 @@ namespace VRVolley.Gameplay
 
         private float _cooldownTimer;
         private MaterialPropertyBlock _propBlock;
+        private InputAction _rightTriggerAction;
+        private InputAction _leftTriggerAction;
+        private bool _isHovered;
+        private VRVolleyHaptics _haptics;
 
         public void Configure(DrillSituation situation, DrillSituationManager manager, MeshRenderer renderer, Color normalColor)
         {
@@ -44,8 +49,34 @@ namespace VRVolley.Gameplay
             {
                 _manager = FindFirstObjectByType<DrillSituationManager>();
             }
+            if (_haptics == null)
+            {
+                _haptics = FindFirstObjectByType<VRVolleyHaptics>();
+            }
             _propBlock = new MaterialPropertyBlock();
             SetColor(_normalColor);
+
+            _rightTriggerAction = new InputAction("RightTrigger", InputActionType.Button, "<XRController>{RightHand}/triggerPressed");
+            _leftTriggerAction = new InputAction("LeftTrigger", InputActionType.Button, "<XRController>{LeftHand}/triggerPressed");
+        }
+
+        private void OnEnable()
+        {
+            if (_rightTriggerAction != null) _rightTriggerAction.Enable();
+            if (_leftTriggerAction != null) _leftTriggerAction.Enable();
+        }
+
+        private void OnDisable()
+        {
+            if (_rightTriggerAction != null) _rightTriggerAction.Disable();
+            if (_leftTriggerAction != null) _leftTriggerAction.Disable();
+            _isHovered = false;
+        }
+
+        private void OnDestroy()
+        {
+            if (_rightTriggerAction != null) _rightTriggerAction.Dispose();
+            if (_leftTriggerAction != null) _leftTriggerAction.Dispose();
         }
 
         private void Update()
@@ -54,21 +85,48 @@ namespace VRVolley.Gameplay
             {
                 _cooldownTimer -= Time.deltaTime;
             }
+
+            if (_isHovered && _cooldownTimer <= 0f)
+            {
+                bool triggerPressed = false;
+                if (_rightTriggerAction != null && _rightTriggerAction.WasPressedThisFrame()) triggerPressed = true;
+                if (_leftTriggerAction != null && _leftTriggerAction.WasPressedThisFrame()) triggerPressed = true;
+                if (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame)) triggerPressed = true;
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) triggerPressed = true;
+
+                if (triggerPressed)
+                {
+                    PressButton();
+                }
+            }
         }
 
         private void OnTriggerEnter(Collider other)
         {
-            if (_cooldownTimer > 0f)
-            {
-                return;
-            }
-
-            // Triggered by hand/controller contact capsule or ray
             if (other.GetComponentInParent<TrackedVelocityEstimator>() != null ||
+                other.GetComponentInParent<VRTrackedController>() != null ||
                 other.GetComponentInParent<BodyContactVolumes>() != null ||
                 other.CompareTag("Player") || other.CompareTag("GameController"))
             {
-                PressButton();
+                _isHovered = true;
+                SetColor(_hoverColor);
+                if (_haptics != null)
+                {
+                    _haptics.PlayContactHaptic(true, 3.0f, 0.02f);
+                    _haptics.PlayContactHaptic(false, 3.0f, 0.02f);
+                }
+            }
+        }
+
+        private void OnTriggerExit(Collider other)
+        {
+            if (other.GetComponentInParent<TrackedVelocityEstimator>() != null ||
+                other.GetComponentInParent<VRTrackedController>() != null ||
+                other.GetComponentInParent<BodyContactVolumes>() != null ||
+                other.CompareTag("Player") || other.CompareTag("GameController"))
+            {
+                _isHovered = false;
+                SetColor(_normalColor);
             }
         }
 
@@ -76,7 +134,7 @@ namespace VRVolley.Gameplay
         public void PressButton()
         {
             _cooldownTimer = _cooldown;
-            SetColor(_hoverColor);
+            SetColor(Color.white);
 
             if (_manager != null)
             {
@@ -90,19 +148,18 @@ namespace VRVolley.Gameplay
                 }
             }
 
-            var haptics = FindFirstObjectByType<VRVolleyHaptics>();
-            if (haptics != null)
+            if (_haptics != null)
             {
-                haptics.PlayContactHaptic(true, 10.0f, 0.05f);
-                haptics.PlayContactHaptic(false, 10.0f, 0.05f);
+                _haptics.PlayContactHaptic(true, 12.0f, 0.06f);
+                _haptics.PlayContactHaptic(false, 12.0f, 0.06f);
             }
 
-            Invoke(nameof(ResetColor), 0.25f);
+            Invoke(nameof(ResetColorAfterPress), 0.20f);
         }
 
-        private void ResetColor()
+        private void ResetColorAfterPress()
         {
-            SetColor(_normalColor);
+            SetColor(_isHovered ? _hoverColor : _normalColor);
         }
 
         private void SetColor(Color col)

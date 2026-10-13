@@ -249,8 +249,8 @@ namespace VRVolley.Gameplay
         {
             MovePlayerTo(new Vector3(0f, 0f, -8.5f));
 
-            // Position ball slightly behind / to the side of the player within easy arm's reach
-            Vector3 hoverPos = new Vector3(-0.30f, 1.30f, -8.85f);
+            // Position ball in front of player within comfortable arm's reach (chest height, Z = -8.20m, X = -0.25m)
+            Vector3 hoverPos = new Vector3(-0.25f, 1.25f, -8.20f);
             _ballBody.SuspendAt(hoverPos);
         }
 
@@ -262,8 +262,8 @@ namespace VRVolley.Gameplay
             }
             if (_kioskTransform != null)
             {
-                _kioskTransform.position = position + new Vector3(-1.0f, 0f, 0.2f);
-                _kioskTransform.rotation = Quaternion.Euler(0f, 45f, 0f);
+                _kioskTransform.position = position + new Vector3(-1.8f, 0f, 0.5f);
+                _kioskTransform.rotation = Quaternion.Euler(0f, 60f, 0f);
             }
         }
 

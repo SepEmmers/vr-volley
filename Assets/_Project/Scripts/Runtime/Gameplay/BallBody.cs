@@ -46,6 +46,11 @@ namespace VRVolley.Gameplay
             _profile = _useBeachProfile ? BallProfileData.DefaultBeach : BallProfileData.DefaultIndoor;
             _sweepHits = new RaycastHit[MaxSweepHits];
 
+            if (_environmentLayers.value == 0)
+            {
+                _environmentLayers = LayerMask.GetMask("Default");
+            }
+
             if (_visualBallTransform == null)
             {
                 _visualBallTransform = transform;

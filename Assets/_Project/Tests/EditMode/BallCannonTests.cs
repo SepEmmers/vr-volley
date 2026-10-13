@@ -34,5 +34,35 @@ namespace VRVolley.Tests.EditMode
             Assert.AreEqual(target.y, state.Position.y, 0.05f);
             Assert.AreEqual(target.z, state.Position.z, 0.05f);
         }
+
+        [Test]
+        public void ServeToss_RisesSmoothlyToApex_AndFallsUnderGravity()
+        {
+            Vector3 releasePos = new Vector3(0.2f, 1.4f, -7.0f);
+            Vector3 tossVel = new Vector3(0.1f, 4.0f, 0.5f);
+            var profile = BallProfileData.DefaultBeach;
+            var state = new BallState(releasePos, tossVel, Vector3.zero);
+
+            float dt = 1f / 72f;
+            float maxApexY = releasePos.y;
+            float flightTime = 0f;
+
+            // Step for 1.2 seconds of flight
+            for (int i = 0; i < 86; i++)
+            {
+                BallIntegrator.Step(ref state, in profile, dt, BallIntegrator.StandardGravity);
+                flightTime += dt;
+                if (state.Position.y > maxApexY)
+                {
+                    maxApexY = state.Position.y;
+                }
+            }
+
+            // At 4 m/s upward, apex is roughly 1.4 + 4^2 / (2 * 9.81) ≈ 2.21m
+            Assert.Greater(maxApexY, 2.10f);
+            Assert.Less(maxApexY, 2.30f);
+            // After 1.2s, ball should have fallen past release height
+            Assert.Less(state.Position.y, releasePos.y);
+        }
     }
 }
